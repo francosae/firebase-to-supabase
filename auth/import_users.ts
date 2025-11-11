@@ -244,13 +244,18 @@ function createUserHeader() {
     ) VALUES `;
 }
 function createUser(user: any) {
+    // Escape single quotes for SQL by doubling them
+    const escapedEmail = user.email ? user.email.replace(/'/g, "''") : '';
+    const escapedUserJson = JSON.stringify(user).replace(/'/g, "''");
+    const escapedProviderString = getProviderString(user.providerData).replace(/'/g, "''");
+
     const sql = `(
         '00000000-0000-0000-0000-000000000000', /* instance_id */
         uuid_generate_v4(), /* id */
         'authenticated', /* aud character varying(255),*/
         'authenticated', /* role character varying(255),*/
-        '${user.email}', /* email character varying(255),*/
-        '', /* encrypted_password character varying(255),*/
+        '${escapedEmail}', /* email character varying(255),*/
+        null, /* encrypted_password character varying(255),*/
         ${user.emailVerified ? 'NOW()' : 'null'}, /* email_confirmed_at timestamp with time zone,*/
         '${formatDate(user.metadata.creationTime)}', /* invited_at timestamp with time zone, */
         '', /* confirmation_token character varying(255), */
@@ -261,8 +266,8 @@ function createUser(user: any) {
         '', /* email_change character varying(255), */
         null, /* email_change_sent_at timestamp with time zone, */
         null, /* last_sign_in_at timestamp with time zone, */
-        '${getProviderString(user.providerData)}', /* raw_app_meta_data jsonb,*/
-        '{"fbuser":${JSON.stringify(user)}}', /* raw_user_meta_data jsonb,*/
+        '${escapedProviderString}', /* raw_app_meta_data jsonb,*/
+        '{"fbuser":${escapedUserJson}}', /* raw_user_meta_data jsonb,*/
         false, /* is_super_admin boolean, */
         NOW(), /* created_at timestamp with time zone, */
         NOW(), /* updated_at timestamp with time zone, */
@@ -272,7 +277,7 @@ function createUser(user: any) {
         '', /* phone_change_token character varying(255) DEFAULT ''::character varying, */
         null, /* phone_change_sent_at timestamp with time zone, */
         '', /* email_change_token_current character varying(255) DEFAULT ''::character varying, */
-        0 /*email_change_confirm_status smallint DEFAULT 0 */   
+        0 /*email_change_confirm_status smallint DEFAULT 0 */
     )`;
     return sql;
 }

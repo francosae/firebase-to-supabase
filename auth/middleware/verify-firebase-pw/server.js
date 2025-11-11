@@ -7,10 +7,10 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const port = process.env.PORT || 3000;
 const firebaseParameters = {
-  memCost: process.env.MEMCOST,
-  rounds: process.env.ROUDNS, 
-  saltSeparator: process.env.SALTSEPARATOR, 
-  signerKey: process.env.SIGNERKEY 
+  memCost: parseInt(process.env.MEMCOST) || 14,
+  rounds: parseInt(process.env.ROUNDS) || 8, 
+  saltSeparator: process.env.SALTSEPARATOR || "Bw==", 
+  signerKey: process.env.SIGNERKEY || "VYKo0a2XuyDIh6vKjwudPqCSDerFT39YB8juN30wZrqTItSiMsKbtSZyxODPEAXjeOQVHqxmKO3DryyzA7a/rw==" 
 }
 const scrypt = new FirebaseScryptLib.FirebaseScrypt(firebaseParameters);
 

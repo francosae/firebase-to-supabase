@@ -8,4 +8,6 @@ supabase-service.json
 __*
 fly.toml
 local.env.sh
+import-output.log
+package-lock.json
 

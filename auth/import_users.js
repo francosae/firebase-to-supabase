@@ -14,7 +14,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
-        while (_) try {
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
             if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
             if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
@@ -35,7 +35,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-exports.__esModule = true;
+Object.defineProperty(exports, "__esModule", { value: true });
 var fs = require("fs");
 var moment = require("moment");
 var pg_1 = require("pg");
@@ -167,28 +167,26 @@ function loadUsers_old(filename) {
                     fs.writeFileSync("./queue.tmp", '', 'utf-8');
                     //You'll get json objects here
                     //Key is the array-index here
-                    jsonStream.on('data', function (_a) {
-                        var key = _a.key, value = _a.value;
-                        return __awaiter(_this, void 0, void 0, function () {
-                            var index, user;
-                            return __generator(this, function (_b) {
-                                console.log('on data', key);
-                                index = key;
-                                user = value;
-                                insertRows.push(createUser(user));
-                                fs.appendFileSync("./queue.tmp", createUser(user) + '\n', 'utf-8');
-                                console.log('insertRows.length', insertRows.length);
-                                if (insertRows.length >= 10) {
-                                    console.log('calling insertUsers');
-                                    //const result = await insertUsers(insertRows);
-                                    //console.log('insertUsers result', result);
-                                    //quit();
-                                    //insertRows = [];
-                                }
-                                return [2 /*return*/];
-                            });
+                    jsonStream.on('data', function (_a) { return __awaiter(_this, [_a], void 0, function (_b) {
+                        var index, user;
+                        var key = _b.key, value = _b.value;
+                        return __generator(this, function (_c) {
+                            console.log('on data', key);
+                            index = key;
+                            user = value;
+                            insertRows.push(createUser(user));
+                            fs.appendFileSync("./queue.tmp", createUser(user) + '\n', 'utf-8');
+                            console.log('insertRows.length', insertRows.length);
+                            if (insertRows.length >= 10) {
+                                console.log('calling insertUsers');
+                                //const result = await insertUsers(insertRows);
+                                //console.log('insertUsers result', result);
+                                //quit();
+                                //insertRows = [];
+                            }
+                            return [2 /*return*/];
                         });
-                    });
+                    }); });
                     jsonStream.on('error', function (err) {
                         console.log('loadUsers error', err);
                         quit();
@@ -297,7 +295,11 @@ function createUserHeader() {
     return "INSERT INTO auth.users (\n        instance_id,\n        id,\n        aud,\n        role,\n        email,\n        encrypted_password,\n        email_confirmed_at,\n        invited_at,\n        confirmation_token,\n        confirmation_sent_at,\n        recovery_token,\n        recovery_sent_at,\n        email_change_token_new,\n        email_change,\n        email_change_sent_at,\n        last_sign_in_at,\n        raw_app_meta_data,\n        raw_user_meta_data,\n        is_super_admin,\n        created_at,\n        updated_at,\n        phone,\n        phone_confirmed_at,\n        phone_change,\n        phone_change_token,\n        phone_change_sent_at,\n        email_change_token_current,\n        email_change_confirm_status    \n    ) VALUES ";
 }
 function createUser(user) {
-    var sql = "(\n        '00000000-0000-0000-0000-000000000000', /* instance_id */\n        uuid_generate_v4(), /* id */\n        'authenticated', /* aud character varying(255),*/\n        'authenticated', /* role character varying(255),*/\n        '".concat(user.email, "', /* email character varying(255),*/\n        '', /* encrypted_password character varying(255),*/\n        ").concat(user.emailVerified ? 'NOW()' : 'null', ", /* email_confirmed_at timestamp with time zone,*/\n        '").concat(formatDate(user.metadata.creationTime), "', /* invited_at timestamp with time zone, */\n        '', /* confirmation_token character varying(255), */\n        null, /* confirmation_sent_at timestamp with time zone, */\n        '', /* recovery_token character varying(255), */\n        null, /* recovery_sent_at timestamp with time zone, */\n        '', /* email_change_token_new character varying(255), */\n        '', /* email_change character varying(255), */\n        null, /* email_change_sent_at timestamp with time zone, */\n        null, /* last_sign_in_at timestamp with time zone, */\n        '").concat(getProviderString(user.providerData), "', /* raw_app_meta_data jsonb,*/\n        '{\"fbuser\":").concat(JSON.stringify(user), "}', /* raw_user_meta_data jsonb,*/\n        false, /* is_super_admin boolean, */\n        NOW(), /* created_at timestamp with time zone, */\n        NOW(), /* updated_at timestamp with time zone, */\n        null, /* phone character varying(15) DEFAULT NULL::character varying, */\n        null, /* phone_confirmed_at timestamp with time zone, */\n        '', /* phone_change character varying(15) DEFAULT ''::character varying, */\n        '', /* phone_change_token character varying(255) DEFAULT ''::character varying, */\n        null, /* phone_change_sent_at timestamp with time zone, */\n        '', /* email_change_token_current character varying(255) DEFAULT ''::character varying, */\n        0 /*email_change_confirm_status smallint DEFAULT 0 */   \n    )");
+    // Escape single quotes for SQL by doubling them
+    var escapedEmail = user.email ? user.email.replace(/'/g, "''") : '';
+    var escapedUserJson = JSON.stringify(user).replace(/'/g, "''");
+    var escapedProviderString = getProviderString(user.providerData).replace(/'/g, "''");
+    var sql = "(\n        '00000000-0000-0000-0000-000000000000', /* instance_id */\n        uuid_generate_v4(), /* id */\n        'authenticated', /* aud character varying(255),*/\n        'authenticated', /* role character varying(255),*/\n        '".concat(escapedEmail, "', /* email character varying(255),*/\n        null, /* encrypted_password character varying(255),*/\n        ").concat(user.emailVerified ? 'NOW()' : 'null', ", /* email_confirmed_at timestamp with time zone,*/\n        '").concat(formatDate(user.metadata.creationTime), "', /* invited_at timestamp with time zone, */\n        '', /* confirmation_token character varying(255), */\n        null, /* confirmation_sent_at timestamp with time zone, */\n        '', /* recovery_token character varying(255), */\n        null, /* recovery_sent_at timestamp with time zone, */\n        '', /* email_change_token_new character varying(255), */\n        '', /* email_change character varying(255), */\n        null, /* email_change_sent_at timestamp with time zone, */\n        null, /* last_sign_in_at timestamp with time zone, */\n        '").concat(escapedProviderString, "', /* raw_app_meta_data jsonb,*/\n        '{\"fbuser\":").concat(escapedUserJson, "}', /* raw_user_meta_data jsonb,*/\n        false, /* is_super_admin boolean, */\n        NOW(), /* created_at timestamp with time zone, */\n        NOW(), /* updated_at timestamp with time zone, */\n        null, /* phone character varying(15) DEFAULT NULL::character varying, */\n        null, /* phone_confirmed_at timestamp with time zone, */\n        '', /* phone_change character varying(15) DEFAULT ''::character varying, */\n        '', /* phone_change_token character varying(255) DEFAULT ''::character varying, */\n        null, /* phone_change_sent_at timestamp with time zone, */\n        '', /* email_change_token_current character varying(255) DEFAULT ''::character varying, */\n        0 /*email_change_confirm_status smallint DEFAULT 0 */\n    )");
     return sql;
 }
 function getProviderString(providerData) {
