@@ -1,0 +1,26 @@
+{
+  "name": "verify-firebase-token",
+  "version": "1.0.0",
+  "description": "Middleware service to verify Firebase ID tokens using Firebase Admin SDK",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "firebase",
+    "authentication",
+    "token-verification",
+    "middleware"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "restana": "^4.9.9",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
