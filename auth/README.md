@@ -1,16 +1,37 @@
 # Firebase to Supabase: Auth Migration
 
-This module automates the process of converting auth users from a Firebase project to a Supabase project.  There are 3 parts to the migration process:
+This module automates the process of converting auth users from a Firebase project to a Supabase project.
+
+## 🚀 NEW: Complete Password-Preserving Migration
+
+**Looking for a complete solution that preserves passwords and sessions?**
+
+→ **[See MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** for the complete end-to-end migration solution
+→ **[See QUICK_START.md](./QUICK_START.md)** for a 5-minute setup guide
+
+The new solution includes:
+- ✅ Supabase Edge Function for automatic password migration on first login
+- ✅ React Native helpers for seamless client-side migration
+- ✅ Support for both password-based and OAuth users
+- ✅ Zero password resets required
+
+---
+
+## Overview
+
+There are 3 parts to the migration process:
 
 - `firestoreusers2json` exports users from an existing Firebase project to a `.json` file on your local system
 - `import_users` imports users from a saved `.json` file into your Supabase project (inserting those users into the `auth.users` table of your `PostgreSQL` database instance)
-- `middleware` server component for verifying a user's existing Firebase password and updating that password in your Supabase project the first time a user logs in **[WORK IN PROGRESS]**
-    - [done] local node server for checking Firebase password
-    - [done] [fly.io](https://fly.io) server for checking Firebase password
-    - [tbd] AWS Lambda server for checking Firebase password
-    - [tbd] local node server for updating Supabase password on first login
-    - [tbd] [fly.io](https://fly.io) server for updating Supabase password on first login
-    - [tbd] AWS Lambda server for updating Supabase password on first login
+- `middleware` server component for verifying a user's existing Firebase password
+    - ✅ local node server for checking Firebase password
+    - ✅ [fly.io](https://fly.io) server for checking Firebase password
+    - ✅ Supabase Edge Function for password migration on first login (NEW!)
+- `supabase-functions` Edge Functions for seamless password migration
+    - ✅ `migrate-firebase-password` - Automatic password verification and migration
+- `react-native-helpers` Client-side helpers for React Native/Expo apps
+    - ✅ `authMigration.ts` - Complete auth migration helpers
+    - ✅ `ExampleLoginScreen.tsx` - Reference implementation
 
 
 ### Configuration
