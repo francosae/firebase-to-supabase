@@ -1,0 +1,21 @@
+app = "your-app-name-firebase-token-verify"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[env]
+  PORT = "3001"
+  FIREBASE_SERVICE_ACCOUNT_PATH = "/app/firebase-service.json"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

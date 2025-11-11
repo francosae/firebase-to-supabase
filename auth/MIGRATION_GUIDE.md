@@ -2,13 +2,32 @@
 
 This guide covers the complete process of migrating your users from Firebase Auth to Supabase Auth while **preserving passwords** and **minimizing user disruption**.
 
+## 🚀 NEW: Zero-Disruption Migration with Session Exchange
+
+**Want users to stay signed in without re-authentication?**
+
+→ **[See SESSION_EXCHANGE_GUIDE.md](./SESSION_EXCHANGE_GUIDE.md)** for the session exchange approach
+
+The session exchange approach validates Firebase sessions and issues Supabase sessions automatically - **users never sign out!**
+
+This guide covers the complete migration including session exchange.
+
 ## 🎯 Overview
 
 This migration solution handles three types of users:
 
-1. **OAuth users** (Google, Apple, Facebook) - Need to re-authenticate via OAuth (one-time)
-2. **Password-based users** - Passwords are migrated seamlessly on first login
-3. **Anonymous users** - Will need to create new accounts
+1. **Users with active Firebase sessions** - Automatically exchanged for Supabase sessions (NO sign-out!)
+2. **OAuth users** (Google, Apple, Facebook) - Re-authenticate via OAuth (one-time) OR session exchange
+3. **Password-based users** - Passwords are migrated seamlessly on first login
+4. **Anonymous users** - Will need to create new accounts
+
+## 🤔 Can We Rehash Passwords From Firebase to Supabase?
+
+**No** - and here's why:
+
+Firebase uses `scrypt(password, salt, firebase_params)` to create hashes. Supabase uses `bcrypt(password, salt)`. You **cannot** convert one hash format to another without the original password - that's what makes hashing secure (it's one-way).
+
+**Solution:** Use session exchange (no password needed!) + password migration on first login (automatic)
 
 ## ✅ What You've Already Done
 
@@ -19,6 +38,30 @@ Based on your sample data, you've already:
 - ✅ Deployed the password verification middleware
 
 ## 🚀 Complete Deployment Steps
+
+### Step 0: Deploy Firebase Token Verification Service (Recommended!)
+
+**This allows session exchange so users stay logged in!**
+
+```bash
+cd auth/middleware/verify-firebase-token
+
+# Install dependencies
+npm install
+
+# Copy your Firebase service account file
+cp /path/to/firebase-service.json ./
+
+# Deploy to Fly.io
+flyctl launch --name your-app-firebase-token
+flyctl deploy
+
+# Test it
+curl https://your-app-firebase-token.fly.dev
+# Should return: verify-firebase-token v1
+```
+
+**Note:** Save your deployment URL for Step 2b!
 
 ### Step 1: Deploy the Password Verification Middleware
 
@@ -77,9 +120,9 @@ curl http://localhost:3000
 # Should return: verify-firebase-pw v7
 ```
 
-### Step 2: Deploy the Supabase Edge Function
+### Step 2a: Deploy Session Exchange Edge Function (Recommended!)
 
-This Edge Function handles password migration seamlessly.
+This Edge Function exchanges Firebase sessions for Supabase sessions - users stay logged in!
 
 ```bash
 # Install Supabase CLI if you haven't already
@@ -91,6 +134,26 @@ supabase login
 # Link to your Supabase project
 supabase link --project-ref YOUR_PROJECT_REF
 
+# Deploy the Edge Function
+cd auth/supabase-functions
+supabase functions deploy exchange-firebase-session
+
+# Set environment variables (secrets)
+supabase secrets set FIREBASE_TOKEN_VERIFY_URL=https://your-app-firebase-token.fly.dev
+supabase secrets set SUPABASE_URL=https://your-project.supabase.co
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+**Get your secrets from:**
+- `FIREBASE_TOKEN_VERIFY_URL`: Your fly.io deployment URL from Step 0
+- `SUPABASE_URL`: Supabase Dashboard → Settings → API → Project URL
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase Dashboard → Settings → API → service_role key
+
+### Step 2b: Deploy Password Migration Edge Function
+
+This Edge Function handles password migration for users who sign in with password.
+
+```bash
 # Deploy the Edge Function
 cd auth/supabase-functions
 supabase functions deploy migrate-firebase-password
