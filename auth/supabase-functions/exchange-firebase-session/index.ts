@@ -181,6 +181,22 @@ serve(async (req) => {
 
     console.log('✅ Session exchange successful!')
 
+    // Mark that session was exchanged (for tracking)
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(
+        user.id,
+        {
+          user_metadata: {
+            ...user.user_metadata,
+            last_firebase_session_exchange: new Date().toISOString()
+          }
+        }
+      )
+      console.log('📊 Tracked session exchange for user:', user.id)
+    } catch (trackError) {
+      console.warn('Failed to track session exchange (non-critical):', trackError)
+    }
+
     // Return the Supabase session
     return new Response(
       JSON.stringify({
