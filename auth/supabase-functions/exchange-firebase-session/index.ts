@@ -70,6 +70,8 @@ serve(async (req) => {
 
     const firebaseUser = await verifyResponse.json()
     console.log('Firebase token valid for user:', firebaseUser.uid)
+    console.log('Firebase user email:', firebaseUser.email)
+    console.log('Full Firebase user data:', JSON.stringify(firebaseUser))
 
     // Create Supabase admin client
     const supabaseAdmin = createClient(
@@ -94,6 +96,20 @@ serve(async (req) => {
       )
     }
 
+    console.log(`Found ${users.length} users in Supabase`)
+    console.log('Looking for Firebase UID:', firebaseUser.uid)
+    console.log('Looking for email:', firebaseUser.email)
+
+    // Debug: Check first few users
+    users.slice(0, 3).forEach((u, i) => {
+      console.log(`User ${i + 1}:`, {
+        id: u.id,
+        email: u.email,
+        metadata_fbuser_uid: u.user_metadata?.fbuser?.uid,
+        has_fbuser: !!u.user_metadata?.fbuser
+      })
+    })
+
     // Find user by Firebase UID or email
     const user = users.find(u =>
       u.user_metadata?.fbuser?.uid === firebaseUser.uid ||
@@ -101,11 +117,39 @@ serve(async (req) => {
     )
 
     if (!user) {
-      console.log('User not found in Supabase')
+      console.log('❌ User not found in Supabase')
+      console.log('Searched for:', {
+        firebase_uid: firebaseUser.uid,
+        firebase_email: firebaseUser.email
+      })
+
+      // Find users with matching email to debug
+      const emailMatches = users.filter(u =>
+        u.email?.toLowerCase() === firebaseUser.email?.toLowerCase()
+      )
+      console.log('Users with matching email:', emailMatches.length)
+      if (emailMatches.length > 0) {
+        emailMatches.forEach(u => {
+          console.log('  - Email match but UID mismatch:', {
+            email: u.email,
+            supabase_fbuser_uid: u.user_metadata?.fbuser?.uid,
+            firebase_uid: firebaseUser.uid,
+            match: u.user_metadata?.fbuser?.uid === firebaseUser.uid
+          })
+        })
+      }
+
       return new Response(
         JSON.stringify({
           error: 'User not found',
-          hint: 'This user may not have been migrated to Supabase yet'
+          hint: 'This user may not have been migrated to Supabase yet',
+          debug: {
+            searched_for: {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email
+            },
+            total_users: users.length
+          }
         }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
