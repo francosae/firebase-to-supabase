@@ -76,18 +76,16 @@ async function getIdToken(uid) {
   }
 
   console.log('✅ ID token obtained!');
-  console.log('\n📋 Token Details:');
-  console.log('- User ID:', data.localId || '❌ MISSING (this is the problem!)');
-  console.log('- Email:', data.email || '❌ MISSING (this is the problem!)');
-  console.log('- Expires in:', data.expiresIn, 'seconds (usually 3600 = 1 hour)');
 
-  if (!data.localId || !data.email) {
-    console.log('\n⚠️  WARNING: Token missing user data!');
-    console.log('   This will cause session exchange to fail with "User not found"');
-    console.log('   The user likely doesn\'t exist in Firebase Auth anymore.');
-    console.log('\n💡 Full response from Firebase:');
-    console.log(JSON.stringify(data, null, 2));
-  }
+  // Decode the token to extract user data (it's in the JWT, not in the response fields)
+  const tokenParts = data.idToken.split('.');
+  const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString('utf8'));
+
+  console.log('\n📋 Token Details (decoded from JWT):');
+  console.log('- User ID:', payload.user_id || payload.sub || '❌ MISSING');
+  console.log('- Email:', payload.email || '❌ MISSING');
+  console.log('- Email Verified:', payload.email_verified ?? 'N/A');
+  console.log('- Expires in:', data.expiresIn, 'seconds (usually 3600 = 1 hour)');
 
   console.log('\n🎫 ID Token:');
   console.log(data.idToken);

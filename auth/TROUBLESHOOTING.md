@@ -3,11 +3,54 @@
 ## Problem: "User not found" when testing session exchange
 
 This error means either:
-1. The user hasn't been imported to Supabase yet
-2. The Firebase token doesn't contain valid user data
-3. The email/UID doesn't match between Firebase and Supabase
+1. **The Firebase Token Verification Service is not deployed** (most common!)
+2. The user hasn't been imported to Supabase yet
+3. The `FIREBASE_TOKEN_VERIFY_URL` secret is not configured in Supabase
+4. The email/UID doesn't match between Firebase and Supabase
 
 ## Step-by-Step Fix
+
+### Step 0: Deploy the Firebase Token Verification Service (REQUIRED!)
+
+The session exchange Edge Function requires a separate service to validate Firebase tokens. This is the most common cause of the "User not found" error.
+
+```bash
+cd auth/middleware/verify-firebase-token
+
+# Install dependencies
+npm install
+
+# Make sure firebase-service.json is here
+ls firebase-service.json
+
+# Deploy to Fly.io
+flyctl launch --name your-app-firebase-token
+flyctl deploy
+
+# Test it works
+curl https://your-app-firebase-token.fly.dev
+# Should return: verify-firebase-token v1
+
+# Test with a real token
+curl -X POST https://your-app-firebase-token.fly.dev \
+  -H "Content-Type: application/json" \
+  -d '{"token":"YOUR_FIREBASE_ID_TOKEN"}'
+
+# Should return user data:
+# {"uid":"...","email":"...","email_verified":false,...}
+```
+
+**Then configure Supabase:**
+```bash
+# Set the verification service URL
+supabase secrets set FIREBASE_TOKEN_VERIFY_URL=https://your-app-firebase-token.fly.dev
+
+# Verify it's set
+supabase secrets list
+# Should show: FIREBASE_TOKEN_VERIFY_URL=https://your-app-firebase-token.fly.dev
+```
+
+Without this service, the edge function will fail with "User not found"!
 
 ### Step 1: Verify Firebase API Key is Set
 
@@ -162,7 +205,10 @@ curl -X POST https://xnpdfycynygjqsmbmapr.supabase.co/functions/v1/exchange-fire
 ### Issue 4: "FIREBASE_TOKEN_VERIFY_URL not configured"
 
 **Cause:** Edge function secrets not set
-**Fix:** Run `supabase secrets set` commands from Step 4
+**Fix:** Deploy the token verification service (Step 0) and set the secret:
+```bash
+supabase secrets set FIREBASE_TOKEN_VERIFY_URL=https://your-app-firebase-token.fly.dev
+```
 
 ### Issue 5: Custom token works but session exchange fails
 
