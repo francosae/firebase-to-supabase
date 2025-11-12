@@ -105,16 +105,33 @@ serve(async (req) => {
       console.log(`User ${i + 1}:`, {
         id: u.id,
         email: u.email,
+        full_user_metadata: JSON.stringify(u.user_metadata),
         metadata_fbuser_uid: u.user_metadata?.fbuser?.uid,
         has_fbuser: !!u.user_metadata?.fbuser
       })
     })
 
     // Find user by Firebase UID or email
-    const user = users.find(u =>
-      u.user_metadata?.fbuser?.uid === firebaseUser.uid ||
-      (firebaseUser.email && u.email?.toLowerCase() === firebaseUser.email.toLowerCase())
-    )
+    const user = users.find(u => {
+      const matchesUid = u.user_metadata?.fbuser?.uid === firebaseUser.uid
+      const matchesEmail = firebaseUser.email && u.email?.toLowerCase() === firebaseUser.email.toLowerCase()
+
+      if (u.email?.toLowerCase() === firebaseUser.email?.toLowerCase()) {
+        console.log('Email match found, checking UID:', {
+          user_id: u.id,
+          user_email: u.email,
+          metadata_uid: u.user_metadata?.fbuser?.uid,
+          firebase_uid: firebaseUser.uid,
+          uid_match: matchesUid,
+          uid_types: {
+            metadata_uid_type: typeof u.user_metadata?.fbuser?.uid,
+            firebase_uid_type: typeof firebaseUser.uid
+          }
+        })
+      }
+
+      return matchesUid || matchesEmail
+    })
 
     if (!user) {
       console.log('❌ User not found in Supabase')
