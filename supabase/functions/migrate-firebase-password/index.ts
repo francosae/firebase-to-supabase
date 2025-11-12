@@ -98,7 +98,7 @@ serve(async (req) => {
     }
 
     // Step 3: Verify password against Firebase hash using the middleware
-    const FIREBASE_PW_VERIFY_URL = Deno.env.get('FIREBASE_PW_VERIFY_URL')
+    const FIREBASE_PW_VERIFY_URL = "https://olive-pw-check.fly.dev/"
 
     if (!FIREBASE_PW_VERIFY_URL) {
       console.error('FIREBASE_PW_VERIFY_URL not configured')

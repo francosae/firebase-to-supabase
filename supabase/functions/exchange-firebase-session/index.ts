@@ -40,7 +40,7 @@ serve(async (req) => {
     console.log('Validating Firebase token...')
 
     // Validate Firebase token using the Firebase Admin SDK service
-    const FIREBASE_TOKEN_VERIFY_URL = Deno.env.get('FIREBASE_TOKEN_VERIFY_URL')
+    const FIREBASE_TOKEN_VERIFY_URL = "https://olive-token-check-hidden-feather-638.fly.dev/"
 
     if (!FIREBASE_TOKEN_VERIFY_URL) {
       console.error('FIREBASE_TOKEN_VERIFY_URL not configured')
