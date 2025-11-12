@@ -24,12 +24,31 @@ const FIREBASE_PROJECT_ID = serviceAccount.project_id;
 async function getIdToken(uid) {
   console.log('📝 Creating custom token for UID:', uid);
 
+  // Step 0: Verify user exists in Firebase first
+  try {
+    const userRecord = await admin.auth().getUser(uid);
+    console.log('✅ User found in Firebase:');
+    console.log('   - UID:', userRecord.uid);
+    console.log('   - Email:', userRecord.email || '(no email)');
+    console.log('   - Disabled:', userRecord.disabled);
+    console.log('   - Email Verified:', userRecord.emailVerified);
+  } catch (error) {
+    console.error('❌ User NOT found in Firebase Auth!');
+    console.error('   Error:', error.message);
+    console.error('\n💡 This user may have been deleted from Firebase.');
+    console.error('   The custom token will be created but won\'t contain user data.');
+    console.error('   Consider using a UID of a user that still exists in Firebase.\n');
+    // Continue anyway to demonstrate the issue
+  }
+
   // Step 1: Create custom token
   const customToken = await admin.auth().createCustomToken(uid);
   console.log('✅ Custom token created');
 
   // Step 2: Exchange custom token for ID token using Firebase REST API
   console.log('🔄 Exchanging custom token for ID token...');
+  console.log('   API Key:', FIREBASE_API_KEY.substring(0, 10) + '...');
+  console.log('   Project:', FIREBASE_PROJECT_ID);
 
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FIREBASE_API_KEY}`,
@@ -48,15 +67,28 @@ async function getIdToken(uid) {
   const data = await response.json();
 
   if (data.error) {
-    console.error('❌ Error:', data.error);
+    console.error('❌ Error from Firebase REST API:', data.error);
+    console.error('\n💡 Common causes:');
+    console.error('   - Invalid FIREBASE_API_KEY');
+    console.error('   - User deleted from Firebase Auth');
+    console.error('   - Firebase project configuration issue');
     throw new Error(data.error.message);
   }
 
   console.log('✅ ID token obtained!');
   console.log('\n📋 Token Details:');
-  console.log('- User ID:', data.localId);
-  console.log('- Email:', data.email || 'N/A');
+  console.log('- User ID:', data.localId || '❌ MISSING (this is the problem!)');
+  console.log('- Email:', data.email || '❌ MISSING (this is the problem!)');
   console.log('- Expires in:', data.expiresIn, 'seconds (usually 3600 = 1 hour)');
+
+  if (!data.localId || !data.email) {
+    console.log('\n⚠️  WARNING: Token missing user data!');
+    console.log('   This will cause session exchange to fail with "User not found"');
+    console.log('   The user likely doesn\'t exist in Firebase Auth anymore.');
+    console.log('\n💡 Full response from Firebase:');
+    console.log(JSON.stringify(data, null, 2));
+  }
+
   console.log('\n🎫 ID Token:');
   console.log(data.idToken);
   console.log('\n');
