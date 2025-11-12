@@ -1,40 +1,36 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
-/**
- * Exchange Firebase Session for Supabase Session
- *
- * This function validates a Firebase ID token and issues a Supabase session for the same user.
- * This allows users to stay signed in without needing to re-authenticate.
- *
- * Flow:
- * 1. Receive Firebase ID token from client
- * 2. Validate token using Firebase Admin SDK (via external service)
- * 3. Find matching user in Supabase by email/Firebase UID
- * 4. Generate Supabase session for that user
- * 5. Return Supabase session to client
- */
-
-serve(async (req) => {
-  // Handle CORS preflight requests
+async function findUserByEmail(supabase, email) {
+  let page = 1;
+  const perPage = 1000;
+  while(page <= 10){
+    const { data: { users }, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage
+    });
+    if (error) throw error;
+    const user = users.find((u)=>u.email?.toLowerCase() === email.toLowerCase());
+    if (user) return user;
+    if (users.length < perPage) break;
+    page++;
+  }
+  return null;
+}
+serve(async (req)=>{
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
     });
   }
-
   try {
-    // Get the Firebase ID token from request
     const { firebaseToken } = await req.json();
-
     if (!firebaseToken) {
       return new Response(JSON.stringify({
-        error: 'Firebase token is required'
+        error: 'Firebase token required'
       }), {
         status: 400,
         headers: {
@@ -43,27 +39,8 @@ serve(async (req) => {
         }
       });
     }
-
-    console.log('Validating Firebase token...');
-
-    // Validate Firebase token using the Firebase Admin SDK service
-    const FIREBASE_TOKEN_VERIFY_URL = "https://olive-token-check-hidden-feather-638.fly.dev/";
-
-    if (!FIREBASE_TOKEN_VERIFY_URL) {
-      console.error('FIREBASE_TOKEN_VERIFY_URL not configured');
-      return new Response(JSON.stringify({
-        error: 'Firebase token verification service not configured'
-      }), {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
-    }
-
-    // Verify the Firebase token
-    const verifyResponse = await fetch(FIREBASE_TOKEN_VERIFY_URL, {
+    // Verify Firebase token
+    const verifyResp = await fetch("https://olive-token-check-hidden-feather-638.fly.dev/", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -72,12 +49,9 @@ serve(async (req) => {
         token: firebaseToken
       })
     });
-
-    if (!verifyResponse.ok) {
-      const errorText = await verifyResponse.text();
-      console.error('Firebase token verification failed:', errorText);
+    if (!verifyResp.ok) {
       return new Response(JSON.stringify({
-        error: 'Invalid or expired Firebase token'
+        error: 'Invalid Firebase token'
       }), {
         status: 401,
         headers: {
@@ -86,83 +60,30 @@ serve(async (req) => {
         }
       });
     }
-
-    const firebaseUser = await verifyResponse.json();
-    console.log('Firebase token valid for user:', firebaseUser.uid);
-
-    // Create Supabase admin client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-
-    // Find the user in Supabase by Firebase UID stored in metadata
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-
-    if (listError) {
-      console.error('Error listing users:', listError);
+    const fbUser = await verifyResp.json();
+    if (!fbUser.email) {
       return new Response(JSON.stringify({
-        error: 'Failed to find user',
-        details: listError.message
+        error: 'No email in token'
       }), {
-        status: 500,
+        status: 400,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'
         }
       });
     }
-
-    // Debug: Log the first user's structure to see the actual metadata format
-    if (users.length > 0) {
-      console.log('Sample user metadata structure:', JSON.stringify({
-        email: users[0].email,
-        user_metadata: users[0].user_metadata,
-        raw_user_meta_data: users[0].raw_user_meta_data
-      }, null, 2));
-    }
-
-    // Find user by Firebase UID or email - try multiple paths
-    const user = users.find((u) => {
-      const fbUidFromMetadata = u.user_metadata?.fbuser?.uid;
-      const fbUidFromRaw = u.raw_user_meta_data?.fbuser?.uid;
-      const emailMatch = firebaseUser.email && u.email?.toLowerCase() === firebaseUser.email.toLowerCase();
-      
-      const uidMatch = fbUidFromMetadata === firebaseUser.uid || fbUidFromRaw === firebaseUser.uid;
-      
-      // Debug log for the user we're looking for
-      if (u.email?.toLowerCase() === firebaseUser.email?.toLowerCase()) {
-        console.log('Found user with matching email:', {
-          email: u.email,
-          fbUidFromMetadata,
-          fbUidFromRaw,
-          lookingForUid: firebaseUser.uid,
-          uidMatch,
-          emailMatch
-        });
+    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-      
-      return uidMatch || emailMatch;
     });
-
+    // Find user
+    const user = await findUserByEmail(supabaseAdmin, fbUser.email);
     if (!user) {
-      console.log('User not found in Supabase');
       return new Response(JSON.stringify({
         error: 'User not found',
-        hint: 'This user may not have been migrated to Supabase yet',
-        debug: {
-          searched_for: {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email
-          },
-          total_users: users.length
-        }
+        email: fbUser.email
       }), {
         status: 404,
         headers: {
@@ -171,79 +92,17 @@ serve(async (req) => {
         }
       });
     }
-
-    console.log('Found Supabase user:', user.id);
-
-    // Generate a Supabase session for this user
-    // We'll create a short-lived token that the client can use to establish a session
-    const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
+    console.log('Found user:', user.id);
+    // Generate OTP for the user
+    const { data: otpData, error: otpError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: user.email,
-      options: {
-        redirectTo: 'noredirect'
-      }
+      email: user.email
     });
-
-    if (tokenError || !tokenData) {
-      console.error('Error generating auth link:', tokenError);
-      // Fallback: Use the session creation method if available
-      // Note: This is a workaround - ideally we'd use admin.createSession when available
-      try {
-        // Alternative approach: Update user metadata to mark session exchange
-        const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-          user.id,
-          {
-            user_metadata: {
-              ...user.user_metadata,
-              last_firebase_session_exchange: new Date().toISOString()
-            }
-          }
-        );
-
-        if (updateError) {
-          console.error('Error updating user metadata:', updateError);
-        }
-
-        // Return user info so client can use it to get a session
-        return new Response(JSON.stringify({
-          user: {
-            id: user.id,
-            email: user.email
-          },
-          exchanged: true,
-          message: 'Firebase session validated. Please sign in with Supabase to complete exchange.',
-          hint: 'Use the migrated password or OAuth'
-        }), {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (fallbackError) {
-        console.error('Fallback failed:', fallbackError);
-        return new Response(JSON.stringify({
-          error: 'Failed to exchange session',
-          details: tokenError?.message
-        }), {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        });
-      }
-    }
-
-    // Extract the token from the magic link
-    const urlParams = new URL(tokenData.properties.action_link).searchParams;
-    const accessToken = urlParams.get('access_token');
-    const refreshToken = urlParams.get('refresh_token');
-
-    if (!accessToken || !refreshToken) {
-      console.error('Failed to extract tokens from magic link');
+    if (otpError || !otpData) {
+      console.error('OTP generation failed:', otpError);
       return new Response(JSON.stringify({
-        error: 'Failed to generate session tokens'
+        error: 'Failed to generate session',
+        details: otpError?.message
       }), {
         status: 500,
         headers: {
@@ -252,21 +111,75 @@ serve(async (req) => {
         }
       });
     }
-
-    console.log('✅ Session exchange successful!');
-
-    // Return the Supabase session
+    // Extract token from the magic link
+    const actionLink = otpData.properties.action_link;
+    console.log('Full action link:', actionLink);
+    const url = new URL(actionLink);
+    const tokenHash = url.searchParams.get('token_hash');
+    const token = url.searchParams.get('token');
+    const type = url.searchParams.get('type');
+    console.log('URL params:', {
+      token_hash: tokenHash,
+      token: token,
+      type: type
+    });
+    // Try token_hash first, fallback to token
+    const authToken = tokenHash || token;
+    if (!authToken) {
+      console.error('No token found in magic link');
+      console.error('All params:', Array.from(url.searchParams.entries()));
+      return new Response(JSON.stringify({
+        error: 'Failed to extract token from magic link',
+        debug: {
+          has_token_hash: !!tokenHash,
+          has_token: !!token,
+          all_params: Array.from(url.searchParams.entries())
+        }
+      }), {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+    console.log('Got token, verifying OTP...');
+    // Use the token to verify and get a session
+    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '');
+    // Use token_hash if available, otherwise use token
+    const verifyParams = {
+      type: type || 'magiclink'
+    };
+    if (tokenHash) {
+      verifyParams.token_hash = tokenHash;
+    } else {
+      verifyParams.token_hash = token;
+    }
+    const { data: sessionData, error: sessionError } = await supabaseClient.auth.verifyOtp(verifyParams);
+    if (sessionError || !sessionData.session) {
+      console.error('Session creation failed:', sessionError);
+      return new Response(JSON.stringify({
+        error: 'Failed to create session',
+        details: sessionError?.message
+      }), {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+    console.log('✅ Session created successfully');
     return new Response(JSON.stringify({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: sessionData.session.access_token,
+      refresh_token: sessionData.session.refresh_token,
+      expires_in: sessionData.session.expires_in,
+      expires_at: sessionData.session.expires_at,
       user: {
-        id: user.id,
-        email: user.email
-      },
-      exchanged: true,
-      message: 'Firebase session successfully exchanged for Supabase session'
+        id: sessionData.user.id,
+        email: sessionData.user.email
+      }
     }), {
-      status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/json'
@@ -275,7 +188,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(JSON.stringify({
-      error: 'Internal server error',
+      error: 'Internal error',
       details: error.message
     }), {
       status: 500,
